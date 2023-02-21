@@ -19,18 +19,20 @@ import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import com.tencent.qgame.animplayer.Constant
-import com.tencent.qgame.animplayer.FileContainer
+import com.tencent.qgame.animplayer.file.IFileContainer
+import kotlin.collections.HashMap
 
 
 object MediaUtil {
 
     private const val TAG = "${Constant.TAG}.MediaUtil"
 
-    val isDeviceSupportHevc by lazy {
-        checkCodec("video/hevc")
-    }
+    private var isTypeMapInit = false
+    private val supportTypeMap = HashMap<String, Boolean>()
 
-    fun getExtractor(file: FileContainer): MediaExtractor {
+    const val MIME_HEVC = "video/hevc"
+
+    fun getExtractor(file: IFileContainer): MediaExtractor {
         val extractor = MediaExtractor()
         file.setDataSource(extractor)
         return extractor
@@ -70,30 +72,36 @@ object MediaUtil {
         return -1
     }
 
-
     /**
      * 检查设备解码支持类型
      */
-    private fun checkCodec(mimeType: String): Boolean {
+    @Synchronized
+    fun checkSupportCodec(mimeType: String): Boolean {
+        if (!isTypeMapInit) {
+            isTypeMapInit = true
+            getSupportType()
+        }
+        return supportTypeMap.containsKey(mimeType.toLowerCase())
+    }
+
+
+    private fun getSupportType() {
         try {
             val numCodecs = MediaCodecList.getCodecCount()
             for (i in 0 until numCodecs) {
                 val codecInfo = MediaCodecList.getCodecInfoAt(i)
-                if (!codecInfo.isEncoder) {
+                if (codecInfo.isEncoder) {
                     continue
                 }
                 val types = codecInfo.supportedTypes
                 for (j in types.indices) {
-                    if (types[j].equals(mimeType, ignoreCase = true)) {
-                        return true
-                    }
+                    supportTypeMap[types[j].toLowerCase()] = true
                 }
             }
-            return false
+            ALog.i(TAG, "supportType=${supportTypeMap.keys}")
         } catch (t: Throwable) {
-            ALog.e(TAG, "checkCodec $t")
-            return false
+            ALog.e(TAG, "getSupportType $t")
         }
-
     }
+
 }

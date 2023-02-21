@@ -18,6 +18,7 @@ package com.tencent.qgame.animplayer
 import android.os.Build
 import android.os.HandlerThread
 import android.os.Handler
+import com.tencent.qgame.animplayer.file.IFileContainer
 import com.tencent.qgame.animplayer.inter.IAnimListener
 import com.tencent.qgame.animplayer.util.ALog
 import com.tencent.qgame.animplayer.util.SpeedControlUtil
@@ -55,7 +56,7 @@ abstract class Decoder(val player: AnimPlayer) : IAnimListener {
         }
     }
 
-    var render: Render? = null
+    var render: IRenderListener? = null
     val renderThread = HandlerHolder(null, null)
     val decodeThread = HandlerHolder(null, null)
     private var surfaceWidth = 0
@@ -70,7 +71,7 @@ abstract class Decoder(val player: AnimPlayer) : IAnimListener {
     var isStopReq = false // 是否需要停止
     val speedControlUtil by lazy { SpeedControlUtil() }
 
-    abstract fun start(fileContainer: FileContainer)
+    abstract fun start(fileContainer: IFileContainer)
 
     fun stop() {
         isStopReq = true
@@ -82,16 +83,20 @@ abstract class Decoder(val player: AnimPlayer) : IAnimListener {
         return createThread(renderThread, "anim_render_thread") && createThread(decodeThread, "anim_decode_thread")
     }
 
-    fun prepareRender(): Boolean {
+    fun prepareRender(needYUV: Boolean): Boolean {
         if (render == null) {
             ALog.i(TAG, "prepareRender")
             player.animView.getSurfaceTexture()?.apply {
-                render = Render(this).apply {
-                    updateViewPort(surfaceWidth, surfaceHeight)
+                if (needYUV) {
+                    ALog.i(TAG, "use yuv render")
+                    render = YUVRender(this)
+                } else {
+                    render = Render(this).apply {
+                        updateViewPort(surfaceWidth, surfaceHeight)
+                    }
                 }
             }
         }
-        render?.createTexture()
         return render != null
     }
 
